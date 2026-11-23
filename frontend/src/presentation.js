@@ -5,12 +5,17 @@ export const states = {
   collecting: '采集中', reference: '标定参考', calibrating: '试算中', review: '待复核', released: '已放行',
   draft: '待冻结', frozen: '已冻结', queued: '已排队', running: '计算中', failed: '计算失败',
   awaiting_verification: '待复测确认', retest_required: '超窗待复测', verified: '待签发', held: '留置',
+  pending: '预警排队', ready: '预警已出分', superseded: '预警已替换', stale: '预警待更新',
 };
 export const events = {
   'batch.register': '登记批次', 'curve.import': '采集曲线', 'curve.freeze': '冻结曲线', 'sample.record': '登记测量',
   'fit.queue': '提交试算', 'fit.retry': '重试试算', 'fit.failed': '计算失败', 'fit.completed': '试算完成',
   'retest.opened': '创建超窗复测单', 'retest.verified': '复测确认', 'retest.held': '复测留置',
   'release.sign': '主管签发', 'reference.archive': '认证参考批次',
+  'vacuum.backfill': '真空分段补传', 'vacuum.backfill.sealed': '封炉后补传另存',
+  'vacuum.warning.queue': '提交首小时预警', 'vacuum.warning.flagged': '首小时超窗预警',
+  'vacuum.warning.clear': '首小时窗内', 'vacuum.warning.failed': '首小时预警失败',
+  'vacuum.warning.stale': '预警按新读数作废', 'chamber.seal': '封炉',
 };
 
 export function h(value = '') {
@@ -38,4 +43,10 @@ export function readCurveCSV(source) {
     }
     return {minute: Number(minute), phase, shelf_c: Number(shelf), pressure_pa: Number(pressure)};
   });
+}
+
+export function readVacuumCSV(source) {
+  const points = readCurveCSV(source).map(point => ({...point, phase: 'vacuum'}));
+  if (!points.length) throw new Error('补传分段至少需要一条抽真空读数');
+  return points;
 }

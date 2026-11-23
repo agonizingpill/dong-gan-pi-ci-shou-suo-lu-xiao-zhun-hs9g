@@ -28,6 +28,7 @@ engine = create_engine(
 Session = sessionmaker(engine, expire_on_commit=False)
 redis = Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/0'), socket_timeout=6)
 QUEUE = 'freeze:fit'
+WARNING_QUEUE = 'freeze:vacuum-warning'
 
 
 def session():

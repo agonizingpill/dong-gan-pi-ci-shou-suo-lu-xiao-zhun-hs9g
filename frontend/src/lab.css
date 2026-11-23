@@ -55,6 +55,9 @@ h1, h2, h3, p, dl, ol { margin: 0; }
 .badge[data-state="frozen"], .badge[data-state="released"], .badge[data-state="verified"] { background: var(--teal-wash); border-color: oklch(87% .052 173); color: var(--teal); }
 .badge[data-state="draft"], .badge[data-state="held"], .badge[data-state="retest_required"], .badge[data-state="failed"] { background: var(--amber-wash); border-color: oklch(89% .055 82); color: var(--amber); }
 .badge[data-state="reference"] { background: var(--ground); border-color: var(--line); color: var(--muted); }
+.badge[data-state="pending"], .badge[data-state="running"], .badge[data-state="stale"] { background: var(--wash); border-color: oklch(87% .04 226); color: var(--blue); }
+.badge[data-state="ready"] { background: var(--teal-wash); border-color: oklch(87% .052 173); color: var(--teal); }
+.badge[data-state="superseded"] { background: var(--ground); border-color: var(--line); color: var(--muted); }
 .batch-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 10px; }
 .batch-heading h2 { font-size: clamp(1.65rem, 3vw, 2.5rem); line-height: 1.1; margin-top: 3px; letter-spacing: -.055em; }
 .specs { display: grid; grid-template-columns: .8fr .65fr 1.2fr 1fr; border-block: 1px solid var(--line); margin: 10px 0 16px; }
@@ -69,9 +72,22 @@ dd { margin: 2px 0 0; overflow-wrap: anywhere; }
 .chart-legend { justify-content: flex-end; color: var(--muted); font-size: .73rem; }
 .chart-legend i { width: 15px; height: 0; display: inline-block; border-top: 2px solid var(--blue); margin-right: 5px; vertical-align: middle; }
 .chart-legend .pressure { border-top: 2px dashed var(--teal); }
+.chart-legend .backfill { border-top: 2px dotted oklch(59% .14 77); }
+.chart-legend .warning-band { height: 9px; border: 1px solid oklch(89% .055 82); border-top-width: 9px; background: oklch(93% .052 84); }
+.seal-hint { color: var(--muted); font-size: .76rem; margin-left: 9px; }
 #chamber-chart { display: block; width: calc(100% - 12px); margin-inline: 6px; height: clamp(183px, 17vw, 228px); }
 .curve-foot { justify-content: space-between; border-top: 1px solid var(--line); color: var(--muted); padding-block: 8px; flex-wrap: wrap; }
 .readings, .history, .evidence { margin-top: 15px; }
+.vacuum-warning { margin-top: 15px; }
+.warning-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.warning-head strong { font-size: clamp(1.4rem, 3vw, 2.1rem); font-weight: 600; letter-spacing: -.05em; }
+.warning-head small { color: var(--muted); font-size: .8rem; }
+.vacuum-warning .hint { color: var(--muted); font-size: .78rem; }
+.vacuum-warning .padded > .text-button { margin-top: 10px; }
+.vacuum-warning .padded > .callout:last-of-type { margin-bottom: 0; }
+.inline-actions { border-top: 1px solid var(--line); padding: 7px 17px; }
+.late-readings table { margin-top: 8px; font-size: .78rem; }
+.late-readings th, .late-readings td { padding: 5px 4px; }
 .versions { padding: 7px 17px; border-top: 1px solid var(--line); font-size: .8rem; }
 .versions ul, .recipe-list { margin: 8px 0; padding: 0; list-style: none; }
 .versions li, .recipe-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 3px 0; }

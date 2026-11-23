@@ -62,6 +62,20 @@ class CurveIn(Input):
         return self
 
 
+class VacuumBackfillIn(Input):
+    segment: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r'^[A-Za-z0-9_.-]{1,64}$')]
+    points: list[Point] = Field(min_length=1, max_length=240)
+
+    @model_validator(mode='after')
+    def vacuum_segment(self):
+        if any(point.phase != Phase.VACUUM for point in self.points):
+            raise ValueError('补传分段只能包含抽真空阶段读数')
+        minutes = [point.minute for point in self.points]
+        if minutes != sorted(set(minutes)):
+            raise ValueError('补传读数的采集分钟必须严格递增')
+        return self
+
+
 class SampleIn(Input):
     specimen: Code
     stage: Stage

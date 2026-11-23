@@ -15,6 +15,7 @@ export function labPage() {
       <div><dt>设备曲线</dt><dd class="mono">${h(detail.runs[0]?.source_name || '未导入')}</dd></div>
       <div><dt>首测记录</dt><dd>${detail.samples.length} 条阶段测量</dd></div>
       <div><dt>收缩率工艺窗</dt><dd class="mono">${windowLabel([recipe.window_low, recipe.window_high])}</dd></div></dl>
+      ${detail.vacuum_warning?.state === 'ready' ? `<p class="callout ${detail.vacuum_warning.flagged ? 'warning' : ''}">抽真空首小时预警：${number(detail.vacuum_warning.prediction_pct)}%，${detail.vacuum_warning.flagged ? '超出工艺窗' : '处于工艺窗'}。正式结果以完整曲线试算为准。</p>` : ''}
       ${detail.readiness_issue ? `<p class="callout warning">${h(detail.readiness_issue)} <a href="#batches/${h(detail.batch.code)}">处理采集记录 →</a></p>` : ''}
       ${entry ? `<a class="primary button-link" href="#release/${entry.id}">查看校准单</a>` : staff && detail.batch.state === 'collecting' ?
         `<button data-action="fit" class="primary" ${detail.readiness_issue ? 'disabled' : ''}>提交冻结曲线试算</button>` : `<p class="empty">${detail.batch.state === 'reference' ? '该批次已认证为历史参考。' : '当前账户仅可查看采集与试算记录。'}</p>`}

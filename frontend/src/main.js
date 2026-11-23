@@ -4,7 +4,7 @@ import {shell} from './components/ledger.js';
 import {batchesPage} from './pages/batches.js';
 import {labPage, releasePage} from './pages/calibration.js';
 import {loginPage} from './pages/login.js';
-import {h, readCurveCSV} from './presentation.js';
+import {h, readCurveCSV, readVacuumCSV} from './presentation.js';
 
 const root = document.getElementById('app');
 const notice = document.getElementById('notice');
@@ -57,7 +57,10 @@ async function draw() {
     const pages = {batches: batchesPage, lab: labPage, release: releasePage};
     show(shell(current, store.user, pages[current]()));
     const canvas = document.getElementById('chamber-chart');
-    if (canvas) stopChart = chart(canvas, store.batch.runs[0].points);
+    if (canvas) {
+      const warningMinutes = store.batch.readings?.warning_minutes || [];
+      stopChart = chart(canvas, store.batch.effective_points, warningMinutes);
+    }
   } catch (error) {
     if (index !== renderIndex) return;
     if (error.status === 401) {
@@ -110,6 +113,27 @@ const commands = {
     await draw();
     document.querySelector('form[data-action="sample"]')?.closest('details')?.setAttribute('open', '');
     toast('阶段读数已登记');
+  },
+  backfill: async ({segment, csv}) => {
+    const result = await api.backfill(store.batch.batch.code, store.batch.runs[0].id, {segment, points: readVacuumCSV(csv)});
+    await draw();
+    const notes = {
+      merged: result.warning_id ? '分段已并入原炉，预警按最新读数重算' : '分段已并入原炉，暂不满足首小时预警条件',
+      unchanged: '分段读数均已存在，未新增预警',
+      duplicate: '同一分段重试，未新增读数或预警',
+      sealed: '封炉后读数已另存，冻结曲线与放行不变',
+    };
+    toast(notes[result.outcome] || '真空分段已接收');
+  },
+  seal: async () => {
+    await api.seal(store.batch.batch.code, store.batch.runs[0].id);
+    await draw();
+    toast('设备周期已封炉，之后补传的读数将另存');
+  },
+  runWarning: async () => {
+    await api.warning(store.batch.batch.code);
+    await draw();
+    toast('首小时预警已提交，按最新读数计算');
   },
   archive: async data => {
     await api.archive(store.batch.batch.code, data);

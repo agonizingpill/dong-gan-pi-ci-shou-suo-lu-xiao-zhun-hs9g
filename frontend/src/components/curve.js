@@ -1,8 +1,9 @@
 import {phases} from '../presentation.js';
 
-export function chart(canvas, points) {
+export function chart(canvas, points, warningMinutes = null) {
   const colors = {paper: 'oklch(99% .006 240)', grid: 'oklch(89% .018 237)', ink: 'oklch(45% .055 250)',
-    temp: 'oklch(38% .093 245)', pressure: 'oklch(53% .102 182)', vacuum: 'oklch(94% .024 218)'};
+    temp: 'oklch(38% .093 245)', pressure: 'oklch(53% .102 182)', vacuum: 'oklch(94% .024 218)',
+    warning: 'oklch(93% .052 84)', warningInk: 'oklch(43% .1 69)'};
   const draw = () => {
     const box = canvas.getBoundingClientRect();
     if (!box.width) return;
@@ -32,6 +33,17 @@ export function chart(canvas, points) {
       ctx.textAlign = 'center';
       ctx.fillText(phases.vacuum, (start + end) / 2, 25);
     }
+    if (warningMinutes?.length) {
+      const start = x(Math.min(...warningMinutes)), end = x(Math.max(...warningMinutes));
+      ctx.fillStyle = colors.warning;
+      ctx.globalAlpha = .55;
+      ctx.fillRect(start, top, end - start, bottom - top);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = colors.warningInk;
+      ctx.font = '11px "Barlow Semi Condensed", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('首小时预警', start + 4, top + 14);
+    }
     ctx.font = '11px "IBM Plex Mono", monospace';
     for (let tick = 0; tick <= 5; tick++) {
       const yy = top + (bottom - top) * tick / 5;
@@ -55,7 +67,10 @@ export function chart(canvas, points) {
       ctx.beginPath(); points.forEach((point, i) => i ? ctx.lineTo(x(point.minute), units(point)) : ctx.moveTo(x(point.minute), units(point))); ctx.stroke();
       ctx.setLineDash([]);
       for (const point of points) {
-        ctx.beginPath(); ctx.arc(x(point.minute), units(point), 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x(point.minute), units(point), point.backfill ? 4 : 3.2, 0, Math.PI * 2); ctx.fill();
+        if (point.backfill) {
+          ctx.strokeStyle = colors.paper; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 2;
+        }
       }
     }
   };

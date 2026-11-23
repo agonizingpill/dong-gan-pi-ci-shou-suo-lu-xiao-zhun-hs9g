@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session as OrmSession
 
 from src.auth import password_hash
 from src.db import engine
-from src.ledger import checksum, queue_fit
+from src.ledger import checksum, queue_fit, queue_warning
 from src.models import BatchState, ChamberRun, DryBatch, RecipeLot, Role, RunState, ShrinkageSample, Stage, User
 
 STAMP = datetime(2026, 11, 21, 0, 0)
@@ -14,7 +14,9 @@ STAMP = datetime(2026, 11, 21, 0, 0)
 def points(minutes, pressure, temp, *, vacuum=True):
     series = [(0, 'freeze', -39.0, 101000.0), (45, 'freeze', -37.0, 98000.0)]
     if vacuum:
-        series += [(60, 'vacuum', temp - 4, pressure + 7), (60 + minutes // 3, 'vacuum', temp - 1, pressure + 2),
+        series += [(60, 'vacuum', temp - 4, pressure + 7), (75, 'vacuum', temp - 3, pressure + 5),
+                   (90, 'vacuum', temp - 2, pressure + 4), (105, 'vacuum', temp - 2, pressure + 3),
+                   (60 + minutes // 3, 'vacuum', temp - 1, pressure + 2),
                    (60 + 2 * minutes // 3, 'vacuum', temp + 1, pressure - 3),
                    (60 + minutes, 'vacuum', temp + 4, pressure - 6)]
     series += [(90 + minutes, 'finish', 9.0, 14.0), (130 + minutes, 'finish', 22.0, 10.0)]
@@ -68,6 +70,8 @@ def seed(db):
         db.flush()
         if code in ('FD-1121A', 'FD-1121C'):
             queue_fit(db, batch, 'operator')
+        if code == 'FD-1121A':
+            queue_warning(db, batch, run, 'operator')
     return len(db.scalars(select(DryBatch.code)).all())
 
 

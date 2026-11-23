@@ -47,6 +47,14 @@ class ReleaseState(StrEnum):
     RELEASED = 'released'
 
 
+class WarningState(StrEnum):
+    PENDING = 'pending'
+    RUNNING = 'running'
+    READY = 'ready'
+    FAILED = 'failed'
+    SUPERSEDED = 'superseded'
+
+
 def enum(values):
     return Enum(values, values_callable=lambda variants: [item.value for item in variants])
 
@@ -89,6 +97,8 @@ class ChamberRun(Base):
     points: Mapped[list] = mapped_column(JSON)
     checksum: Mapped[str | None] = mapped_column(String(64))
     frozen_at = mapped_column(DateTime(), nullable=True)
+    sealed_at = mapped_column(DateTime(), nullable=True)
+    readings_revision: Mapped[int] = mapped_column(default=0)
 
 
 class ShrinkageSample(Base):
@@ -124,6 +134,55 @@ class CalibrationRelease(Base):
     signed_at = mapped_column(DateTime(), nullable=True)
     touched_at = mapped_column(DateTime(), default=utcnow)
     attempts: Mapped[int] = mapped_column(default=0)
+
+
+class VacuumSegment(Base):
+    """One device backfill chunk. Retrying the same segment key adds nothing."""
+    __tablename__ = 'vacuum_segments'
+    __table_args__ = (UniqueConstraint('run_id', 'segment'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey('chamber_runs.id'), index=True)
+    segment: Mapped[str] = mapped_column(String(64))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    readings: Mapped[list] = mapped_column(JSON)
+    reading_count: Mapped[int] = mapped_column()
+    sealed: Mapped[bool] = mapped_column(Boolean, default=False)
+    received_by: Mapped[str] = mapped_column(String(32))
+    received_at = mapped_column(DateTime(), default=utcnow)
+
+
+class LateReading(Base):
+    """Vacuum readings merged into the original run before the chamber was sealed."""
+    __tablename__ = 'late_readings'
+    __table_args__ = (UniqueConstraint('run_id', 'segment', 'minute'), CheckConstraint('minute >= 0'))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey('chamber_runs.id'), index=True)
+    segment: Mapped[str] = mapped_column(String(64))
+    minute: Mapped[int] = mapped_column()
+    phase: Mapped[Phase] = mapped_column(enum(Phase))
+    shelf_c: Mapped[float] = mapped_column(Double)
+    pressure_pa: Mapped[float] = mapped_column(Double)
+    after_seal: Mapped[bool] = mapped_column(Boolean, default=False)
+    received_by: Mapped[str] = mapped_column(String(32))
+    received_at = mapped_column(DateTime(), default=utcnow)
+
+
+class VacuumWarning(Base):
+    __tablename__ = 'vacuum_warnings'
+    __table_args__ = (UniqueConstraint('run_id', 'readings_hash'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey('chamber_runs.id'), index=True)
+    readings_hash: Mapped[str] = mapped_column(String(64))
+    state: Mapped[WarningState] = mapped_column(enum(WarningState), default=WarningState.PENDING, index=True)
+    requested_by: Mapped[str] = mapped_column(String(32))
+    input_hash: Mapped[str] = mapped_column(String(64))
+    snapshot: Mapped[dict] = mapped_column(JSON)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    prediction_pct: Mapped[float | None] = mapped_column(Double)
+    flagged: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    error: Mapped[str | None] = mapped_column(String(240))
+    attempts: Mapped[int] = mapped_column(default=0)
+    touched_at = mapped_column(DateTime(), default=utcnow)
 
 
 class LabEvent(Base):

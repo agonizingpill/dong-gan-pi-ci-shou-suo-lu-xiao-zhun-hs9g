@@ -7,7 +7,7 @@ from . import ledger
 from .auth import identity, issue, require, valid_password
 from .db import session
 from .models import CalibrationRelease, ChamberRun, DryBatch, LabEvent, RecipeLot, Role, User
-from .schemas import BatchIn, CurveIn, DecisionIn, Login, RecipeIn, RetestIn, SampleIn
+from .schemas import BatchIn, CurveIn, DecisionIn, Login, RecipeIn, RetestIn, SampleIn, VacuumBackfillIn
 
 router = APIRouter()
 operator = require(Role.OPERATOR)
@@ -39,6 +39,18 @@ def calibration_context(db, entry_id, lock=False):
     if lock:
         db.refresh(entry, with_for_update=True)
     return batch, run, entry
+
+
+def batch_readings(db, run):
+    """Mark which readings came from backfill and which minutes the shown warning used."""
+    if run is None:
+        return {'origin': {}, 'warning_minutes': [], 'sealed': False}, []
+    origin = {str(minute): segment for minute, segment in ledger.reading_origin(db, run.id).items()}
+    warning, _ = ledger.warning_view(db, run)
+    used = [point['minute'] for point in warning.get('readings', [])] if warning else []
+    display = [point | {'backfill': str(point['minute']) in origin}
+               for point in ledger.effective_points(db, run)]
+    return {'origin': origin, 'warning_minutes': used, 'sealed': run.sealed_at is not None}, display
 
 
 @router.post('/session')
@@ -105,9 +117,46 @@ def batch_detail(code: str, db: Session = Depends(session)):
         ledger.paired_measurements(db, ledger.training_run(db, batch))
     except ValueError as exc:
         readiness = str(exc)
+    warning, warning_note = ledger.warning_view(db, active)
+    readings, effective = batch_readings(db, active)
     return {'batch': ledger.row(batch), 'recipe': ledger.row(db.get(RecipeLot, batch.recipe_code)),
             'runs': [ledger.row(run) for run in runs], 'samples': [ledger.row(sample) for sample in samples],
-            'calibration': ledger.row(entry) if entry else None, 'readiness_issue': readiness}
+            'calibration': ledger.row(entry) if entry else None, 'readiness_issue': readiness,
+            'vacuum_warning': warning, 'warning_note': warning_note,
+            'readings': readings, 'effective_points': effective,
+            'late_readings': [ledger.row(item) for item in ledger.late_readings_for(db, active.id)] if active else []}
+
+
+@router.post('/batches/{code}/curves/{run_id}/vacuum-segments', status_code=201)
+def backfill_vacuum(code: str, run_id: int, payload: VacuumBackfillIn,
+                    db: Session = Depends(session), user=Depends(operator)):
+    batch = ledger.locked_batch(db, code)
+    run = curve_in_batch(db, code, run_id)
+    segment, outcome, warning = ledger.receive_vacuum_segment(db, batch, run, payload, user.username)
+    db.commit()
+    if warning is not None:
+        ledger.wake_warning(warning.id)
+    return {'segment': ledger.row(segment), 'outcome': outcome,
+            'warning_id': warning.id if warning else None,
+            'readings_revision': run.readings_revision}
+
+
+@router.post('/batches/{code}/curves/{run_id}/seal')
+def seal_chamber(code: str, run_id: int, db: Session = Depends(session), user=Depends(operator)):
+    batch = ledger.locked_batch(db, code)
+    run = curve_in_batch(db, code, run_id)
+    ledger.seal_run(db, batch, run, user.username)
+    db.commit()
+    return ledger.row(run)
+
+
+@router.post('/batches/{code}/vacuum-warning', status_code=202)
+def request_vacuum_warning(code: str, db: Session = Depends(session), user=Depends(lab_staff)):
+    batch = ledger.locked_batch(db, code)
+    warning = ledger.request_warning(db, batch, user.username)
+    db.commit()
+    ledger.wake_warning(warning.id)
+    return ledger.row(warning)
 
 
 @router.post('/batches/{code}/curves', status_code=201)
@@ -122,8 +171,10 @@ def import_curve(code: str, payload: CurveIn, db: Session = Depends(session), us
 def freeze(code: str, run_id: int, db: Session = Depends(session), user=Depends(operator)):
     batch = ledger.locked_batch(db, code)
     run = curve_in_batch(db, code, run_id)
-    ledger.freeze_curve(db, batch, run, user.username)
+    warning = ledger.freeze_curve(db, batch, run, user.username)
     db.commit()
+    if warning is not None:
+        ledger.wake_warning(warning.id)
     return ledger.row(run)
 
 
